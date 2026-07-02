@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POLÍCIA RCC - Motor de Auditoria</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="logo-area">
+            <span class="badge-rcc">RCC</span>
+            <div>
+                <h1>Motor de Auditoria e Conformidade</h1>
+                <p class="sub-text">Arquitetura de Alta Performance | Validação Estatutária</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        <section class="left-panel">
+            <div class="card-instruction">
+                <h2>Auditoria Corporativa</h2>
+                <p>Insira o nickname do usuário para iniciar a varredura em tempo real.</p>
+            </div>
+
+            <form id="search-form" class="search-wrapper">
+                <input type="text" id="input-username" value="MATHEUSLATREL" placeholder="Digite o nickname..." autocomplete="off" required>
+                <button type="submit" id="btn-consultar">🔎 PESQUISAR</button>
+            </form>
+
+            <div class="info-box">
+                <p><strong>Verificações ativas neste motor:</strong></p>
+                <ul>
+                    <li>Validação de Nickname (Anti-Bot / Comandos)</li>
+                    <li>Sintaxe de Missão e Resolução Hierárquica</li>
+                    <li>Varredura de Facções Concorrentes</li>
+                    <li>Auditoria Paramétrica de Fardamento</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="right-panel">
+            <div id="result-pane" class="audit-card hidden">
+                <div class="audit-user-header">
+                    <div class="avatar-circle">
+                        <img id="habbo-avatar-head" src="" alt="Avatar">
+                    </div>
+                    <div class="user-info">
+                        <h3 id="habbo-name">-</h3>
+                        <div id="status-geral" class="status-indicator">Aguardando...</div>
+                    </div>
+                </div>
+
+                <div class="avatar-display-area" id="avatar-display">
+                    <div id="validation-logs" class="tags-container">
+                        </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
