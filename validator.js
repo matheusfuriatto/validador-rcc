@@ -2,32 +2,34 @@ import { CONFIG } from './config.js';
 
 export class Validator {
     
-    // Padroniza string (Title Case)
     static formatarNome(nome) {
         if (!nome) return "";
         return nome.charAt(0).toUpperCase() + nome.slice(1).toLowerCase();
-    }
+    } //[cite: 7]
 
     static parseFigure(figureStr) {
         const look = {};
-        if (!figureStr) return look;
+        if (!figureStr) return look; //[cite: 7]
         
         figureStr.split('.').forEach(item => {
-            const [tipo, id, cor1, cor2] = item.split('-');
+            const parts = item.split('-');
+            const tipo = parts[0];
+            if (!tipo) return;
             look[tipo] = {
-                id: parseInt(id, 10),
-                cor1: cor1 ? parseInt(cor1, 10) : null,
-                cor2: cor2 ? parseInt(cor2, 10) : null
+                id: parseInt(parts[1], 10),
+                cor1: parts[2] ? parseInt(parts[2], 10) : null,
+                cor2: parts[3] ? parseInt(parts[3], 10) : null,
+                raw: item
             };
-        });
+        }); //[cite: 7]
         return look;
     }
 
     static validarNickname(username) {
         const nickLower = username.toLowerCase();
-        const temRepeticao = /(.)\1\1+/.test(nickLower);
-        const possuiComando = CONFIG.COMANDOS_PROIBIDOS.some(c => nickLower.includes(c));
-        return { valido: !temRepeticao && !possuiComando, erro: "Nick com comandos ou repetições ilegais." };
+        const temRepeticao = /(.)\1\1+/.test(nickLower); //[cite: 7]
+        const possuiComando = CONFIG.COMANDOS_PROIBIDOS.some(c => nickLower.includes(c)); //[cite: 7]
+        return { valido: !temRepeticao && !possuiComando, erro: "Nick com comandos ou repetições ilegais." }; //[cite: 7]
     }
 
     static validarGrupos(grupos) {
@@ -39,21 +41,90 @@ export class Validator {
                     rivais.push(sigla);
                 }
             });
-        });
-        return { valido: rivais.length === 0, rivais };
+        }); //[cite: 7]
+        return { valido: rivais.length === 0, rivais }; //[cite: 7]
     }
 
     static validarMissaoEstatuto(motto) {
-        const regexBase = /^\[RCC\]\s+(.+?)\s+\[([^\]]+)\](.*)$/i;
-        const match = motto.trim().match(regexBase);
+        if (!motto || motto.trim() === "") return { valido: false, erro: "Usuário sem missão definida.", cargo: "Nenhum" };
 
-        if (!match) return { valido: false, erro: "Padrão inválido. Exija: [RCC] Patente [TAG]" };
+        const regexBase = /^\[RCC\]\s+(.+?)\s+\[([^\]]+)\](.*)$/i; //[cite: 7]
+        const match = motto.trim().match(regexBase); //[cite: 7]
+        const cargoMissao = match ? match[1].trim() : motto.trim(); //[cite: 7]
+        
+        const cargoOficial = CONFIG.GRAFIAS_PERMITIDAS.find(p => p.toLowerCase() === cargoMissao.toLowerCase()); //[cite: 7]
 
-        const cargoMissao = match[1].trim(); 
-        const cargoOficial = CONFIG.GRAFIAS_PERMITIDAS.find(p => p.toLowerCase() === cargoMissao.toLowerCase());
+        if (!cargoOficial) {
+            return { valido: false, erro: `Abreviação ou Cargo ilegal: "${cargoMissao}"`, cargo: "Desconhecido" };
+        }
 
-        if (!cargoOficial) return { valido: false, erro: `Abreviação ilegal: "${cargoMissao}"` };
+        return { valido: true, cargo: cargoOficial }; //[cite: 7]
+    }
 
-        return { valido: true, cargo: cargoOficial };
+    static auditoriaFardamentoCompleta(figureStr, patenteMilitar, cargoEstatutario) {
+        const erros = [];
+        const look = this.parseFigure(figureStr);
+        
+        // CORREÇÃO TRAVA DE SEXO: IDs Habbo hd entre 600 e 699 são exclusivamente cabeças femininas
+        const isFemale = look['hd'] && look['hd'].id >= 600 && look['hd'].id <= 699;
+        const generoIdentificado = isFemale ? "FEMININO" : "MASCULINO";
+        
+        // TRAVA DEFINITIVA: Barba em Mulher gera bloqueio imediato antes de avaliar patentes
+        if (look['fa'] && isFemale) {
+            erros.push("Fardamento Irregular: Avatares femininos estão proibidos de equipar Barbas (fa).");
+        }
+
+        // CORREÇÃO VIP/MARECHAL: Se for VIP ou o cargo mapear para fardamento livre, ignora restrições
+        const regrasPatente = CONFIG.REGRAS_POR_PATENTE ? CONFIG.REGRAS_POR_PATENTE[patenteMilitar] : null;
+        
+        if (cargoEstatutario === "VIP" || patenteMilitar === "Marechal" || (regrasPatente && regrasPatente.free)) {
+            return { valido: erros.length === 0, erros, genero: generoIdentificado };
+        }
+
+        if (look['hd'] && CONFIG.REGRAS_FARDAMENTO.ALLOWED_HD && !CONFIG.REGRAS_FARDAMENTO.ALLOWED_HD.includes(look['hd'].id)) {
+            erros.push("Modelo de Rosto (hd) inválido.");
+        }
+        if (look['hr'] && CONFIG.REGRAS_FARDAMENTO.ALLOWED_HR && !CONFIG.REGRAS_FARDAMENTO.ALLOWED_HR.includes(look['hr'].id)) {
+            erros.push("Modelo de Cabelo (hr) inválido.");
+        }
+
+        const permissaoAcessorios = regrasPatente ? regrasPatente.facial : false;
+
+        if (!permissaoAcessorios) {
+            if (look['ea']) erros.push(`A patente de ${patenteMilitar} não possui concessão para usar Óculos.`);
+            if (look['fa'] && !isFemale) erros.push(`A patente de ${patenteMilitar} não possui concessão para usar Barba.`);
+        } else {
+            if (look['ea']) {
+                if (CONFIG.REGRAS_FARDAMENTO.ALLOWED_EA && !CONFIG.REGRAS_FARDAMENTO.ALLOWED_EA.includes(look['ea'].id)) {
+                    erros.push("Modelo de Óculos (ea) fora do padrão.");
+                }
+                if (look['ea'].cor1 && !CONFIG.REGRAS_FARDAMENTO.ALLOWED_EA_COLORS.includes(look['ea'].cor1)) {
+                    erros.push(`A cor do Óculos (${look['ea'].cor1}) não é permitida regulamentarmente.`);
+                }
+            }
+            if (look['fa'] && !isFemale && CONFIG.REGRAS_FARDAMENTO.ALLOWED_FA && !CONFIG.REGRAS_FARDAMENTO.ALLOWED_FA.includes(look['fa'].id)) {
+                erros.push("Modelo de Barba (fa) fora do padrão.");
+            }
+        }
+
+        if (regrasPatente && !regrasPatente.exec) {
+            const ch = look['ch']; const lg = look['lg']; const sh = look['sh']; const ha = look['ha'];
+            const modeloCamisaEsperado = isFemale ? 665 : 225;
+            const modeloCalcaEsperado = isFemale ? 720 : 285;
+            const modeloSapatoEsperado = isFemale ? 735 : 300;
+
+            if (ch && ch.id !== modeloCamisaEsperado) erros.push(`Modelo de Camisa incompatível. Use ch-${modeloCamisaEsperado}.`);
+            if (lg && lg.id !== modeloCalcaEsperado) erros.push(`Modelo de Calça incompatível. Use lg-${modeloCalcaEsperado}.`);
+            if (sh && sh.id !== modeloSapatoEsperado) erros.push(`Modelo de Sapato incompatível. Use sh-${modeloSapatoEsperado}.`);
+
+            if (lg && sh && lg.cor1 !== sh.cor1) {
+                erros.push("Quebra de Simetria: A cor da Calça deve coincidir com a cor do Sapato.");
+            }
+            if (ha && lg && ha.cor1 !== 73 && ha.cor1 !== 100 && lg.cor1 !== ha.cor1) {
+                erros.push("Quebra de Simetria: A cor da Boina deve seguir a cor da Calça.");
+            }
+        }
+
+        return { valido: erros.length === 0, erros, genero: generoIdentificado };
     }
 }

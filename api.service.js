@@ -8,7 +8,6 @@ class ApiService {
     async fetchUserData(username) {
         const usernameLower = username.toLowerCase();
         
-        // Retorna do cache se já pesquisado nesta sessão
         if (this.cache.has(usernameLower)) {
             return this.cache.get(usernameLower);
         }
@@ -19,7 +18,6 @@ class ApiService {
             
             const userData = await res.json();
             
-            // Busca grupos se o perfil for público
             let groups = [];
             try {
                 const profileRes = await fetch(`${CONFIG.API_BASE_URL}/users/${userData.uniqueId}/profile`);
@@ -28,11 +26,11 @@ class ApiService {
                     groups = profileData.groups || [];
                 }
             } catch (e) {
-                console.info("Perfil privado: Ignorando varredura profunda de grupos.");
+                console.info("Perfil privado: Ignorando varredura de grupos.");
             }
 
             const finalData = { ...userData, groups };
-            this.cache.set(usernameLower, finalData); // Salva no cache
+            this.cache.set(usernameLower, finalData);
             
             return finalData;
             

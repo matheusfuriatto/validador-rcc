@@ -6,7 +6,7 @@ import { UiController } from './ui.controller.js';
 const ui = new UiController();
 
 document.getElementById('search-form').addEventListener('submit', async (e) => {
-    e.preventDefault(); // Evita o reload da página
+    e.preventDefault();
     
     const inputUsername = document.getElementById('input-username').value.trim();
     if (!inputUsername) return;
@@ -18,84 +18,74 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
         const valNick = Validator.validarNickname(inputUsername);
         if (!valNick.valido) temErroGeral = true;
 
-        // Requisição passando pela camada de serviço (com cache ativo)
         const userData = await apiService.fetchUserData(inputUsername);
         const { motto, figureString, name, groups } = userData;
 
-        ui.renderProfile(Validator.formatarNome(name), figureString);
+        // Processa missão, cargo e patente corporativa
+        const valMissao = Validator.validarMissaoEstatuto(motto || "");
+        let patenteMilitar = "Desconhecido";
+        let cargoEstatutario = "Nenhum";
+
+        if (!valMissao.valido) {
+            temErroGeral = true;
+        } else {
+            cargoEstatutario = valMissao.cargo;
+            patenteMilitar = CONFIG.MAPA_CARGOS[valMissao.cargo] || "Desconhecido";
+        }
+
+        // Executa auditoria estrita trazendo o Gênero Biológico decodificado pelo ID hd
+        const auditoriaFarda = Validator.auditoriaFardamentoCompleta(figureString, patenteMilitar, cargoEstatutario);
+
+        // Renderização forçada dos metadados extraídos no cabeçalho futurista
+        ui.renderProfile(
+            Validator.formatarNome(name), 
+            figureString, 
+            auditoriaFarda.genero, 
+            motto, 
+            patenteMilitar
+        );
         ui.clearLogs();
 
         // 1. Logs de Nickname
-        if (!valNick.valido) ui.addLog(`❌ ${valNick.erro}`, "danger");
-        else ui.addLog("✔️ Nickname Aprovado", "success");
+        if (!valNick.valido) ui.addLog(`Nickname: ${valNick.erro}`, "danger");
+        else ui.addLog("Nickname Aprovado e Homologado", "success");
 
-        // 2. Missão e Patente
-        const valMissao = Validator.validarMissaoEstatuto(motto || "");
-        let patenteMilitar = "Nenhuma";
-
+        // 2. Missão e Estatuto
         if (!valMissao.valido) {
-            ui.addLog(`❌ Missão: ${valMissao.erro}`, "danger");
-            temErroGeral = true;
+            ui.addLog(`Missão: ${valMissao.erro}`, "danger");
         } else {
-            ui.addLog(`✔️ Missão OK (${valMissao.cargo})`, "success");
-            patenteMilitar = CONFIG.MAPA_CARGOS[valMissao.cargo] || "Nenhuma";
+            ui.addLog(`Missão Válida (${valMissao.cargo})`, "success");
         }
 
-        // 3. Facções
+        // 3. Associações
         const valGrupos = Validator.validarGrupos(groups);
         if (!valGrupos.valido) {
-            ui.addLog(`❌ Facção Rival: ${valGrupos.rivais.join(', ')}`, "danger");
+            ui.addLog(`Associações: Rival Encontrada -> ${valGrupos.rivais.join(', ')}`, "danger");
             temErroGeral = true;
         } else {
-            ui.addLog("✔️ Associações OK", "success");
+            ui.addLog("Associações e Facções Limpas", "success");
         }
 
-        // 4. Parâmetros Visuais
-        const look = Validator.parseFigure(figureString);
-        const isSargento = CONFIG.PRIVILEGIOS.SARGENTO_OU_SUPERIOR.includes(patenteMilitar);
-        const isVIP = CONFIG.PRIVILEGIOS.COMANDANTE_VIP_MAIS.includes(patenteMilitar);
-
-        // Pele
-        if (look['hd'] && CONFIG.CORES.PELE_PERMITIDAS.includes(look['hd'].cor1)) {
-            ui.addLog("✔️ Tom de Pele Correto", "success");
+        // 4. Parâmetros Visuais e de Fardamento
+        if (patenteMilitar !== "Desconhecido") {
+            if (!auditoriaFarda.valido) {
+                temErroGeral = true;
+                auditoriaFarda.erros.forEach(erro => {
+                    ui.addLog(erro, "danger");
+                });
+            } else {
+                ui.addLog("Fardamento e Parâmetros Visuais em Conformidade", "success");
+            }
         } else {
-            ui.addLog("❌ Pele Inválida", "danger");
+            ui.addLog("Auditoria de Fardamento Cancelada (Patente Inválida)", "danger");
             temErroGeral = true;
         }
 
-        // Barba
-        const temBarba = (look['hd'] && !CONFIG.CATALOGO.ROSTOS_LISOS.includes(look['hd'].id)) || look['fa'];
-        if (temBarba) {
-            if (!isSargento) {
-                ui.addLog("❌ Barba Restrita (Sargento+)", "danger");
-                temErroGeral = true;
-            } else if (look['fa'] && CONFIG.CATALOGO.BARBAS_VIP.includes(look['fa'].id) && !isVIP) {
-                ui.addLog("❌ Barba VIP Restrita", "danger");
-                temErroGeral = true;
-            } else {
-                ui.addLog("✔️ Barba Autorizada", "success");
-            }
-        }
-
-        // Óculos
-        if (look['ea']) {
-            if (!isSargento) {
-                ui.addLog("❌ Óculos Restritos (Sargento+)", "danger");
-                temErroGeral = true;
-            } else if (!CONFIG.CORES.OCULOS_PERMITIDAS.includes(look['ea'].cor1)) {
-                ui.addLog("❌ Óculos (Cor Fora do Padrão)", "danger");
-                temErroGeral = true;
-            } else {
-                ui.addLog("✔️ Óculos Autorizado", "success");
-            }
-        }
-
-        // Finaliza renderizando o status principal
         ui.setStatus(temErroGeral);
 
     } catch (error) {
         ui.clearLogs();
-        ui.addLog(`⚠️ Erro Crítico: ${error.message}`, "danger");
-        ui.setStatus(true, "Falha de Conexão");
+        ui.addLog(`Erro Crítico Operacional: ${error.message}`, "danger");
+        ui.setStatus(true);
     }
 });
