@@ -18,10 +18,14 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
         const valNick = Validator.validarNickname(inputUsername);
         if (!valNick.valido) temErroGeral = true;
 
-        const userData = await apiService.fetchUserData(inputUsername);
+        // Requisições assíncronas paralelas (Habbo API + System Atlas API Interceptação)
+        const [userData, systemCerts] = await Promise.all([
+            apiService.fetchUserData(inputUsername),
+            apiService.fetchSystemCertificates(inputUsername)
+        ]);
+
         const { motto, figureString, name, groups } = userData;
 
-        // Processa missão, cargo e patente corporativa
         const valMissao = Validator.validarMissaoEstatuto(motto || "");
         let patenteMilitar = "Desconhecido";
         let cargoEstatutario = "Nenhum";
@@ -33,10 +37,8 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
             patenteMilitar = CONFIG.MAPA_CARGOS[valMissao.cargo] || "Desconhecido";
         }
 
-        // Executa auditoria estrita trazendo o Gênero Biológico decodificado pelo ID hd
         const auditoriaFarda = Validator.auditoriaFardamentoCompleta(figureString, patenteMilitar, cargoEstatutario);
 
-        // Renderização forçada dos metadados extraídos no cabeçalho futurista
         ui.renderProfile(
             Validator.formatarNome(name), 
             figureString, 
@@ -48,36 +50,51 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
 
         // 1. Logs de Nickname
         if (!valNick.valido) ui.addLog(`Nickname: ${valNick.erro}`, "danger");
-        else ui.addLog("Nickname Aprovado e Homologado", "success");
+        else ui.addLog("Nickname Autorizado no Saguão", "success");
 
-        // 2. Missão e Estatuto
+        // 2. Logs de Missão Básica
         if (!valMissao.valido) {
-            ui.addLog(`Missão: ${valMissao.erro}`, "danger");
+            ui.addLog(`Sintaxe Militar: ${valMissao.erro}`, "danger");
         } else {
-            ui.addLog(`Missão Válida (${valMissao.cargo})`, "success");
+            ui.addLog(`Hierarquia OK: Escalão (${valMissao.cargo})`, "success");
         }
 
-        // 3. Associações
+        // 3. NOVO: Validação Ortogonal de Cursos
+        if (valMissao.valido) {
+            const valCursos = Validator.validarCursosObrigatorios(motto || "", valMissao.cargo, systemCerts);
+            if (valCursos.dadosSystem) {
+                ui.addLog("Sincronização com o Atlas: Integrado com sucesso.", "success");
+            } else {
+                ui.addLog("Aviso: Dados lidos localmente. Logue no System para validar fichas.", "warning");
+            }
+
+            if (!valCursos.valido) {
+                temErroGeral = true;
+                valCursos.erros.forEach(err => ui.addLog(err, "danger"));
+            } else {
+                ui.addLog("Cursos e Instruções Obrigatórias em Conformidade", "success");
+            }
+        }
+
+        // 4. Associações
         const valGrupos = Validator.validarGrupos(groups);
         if (!valGrupos.valido) {
             ui.addLog(`Associações: Rival Encontrada -> ${valGrupos.rivais.join(', ')}`, "danger");
             temErroGeral = true;
         } else {
-            ui.addLog("Associações e Facções Limpas", "success");
+            ui.addLog("Associações Limpas", "success");
         }
 
-        // 4. Parâmetros Visuais e de Fardamento
+        // 5. Parâmetros Visuais de Fardamento
         if (patenteMilitar !== "Desconhecido") {
             if (!auditoriaFarda.valido) {
                 temErroGeral = true;
-                auditoriaFarda.erros.forEach(erro => {
-                    ui.addLog(erro, "danger");
-                });
+                auditoriaFarda.erros.forEach(erro => ui.addLog(erro, "danger"));
             } else {
-                ui.addLog("Fardamento e Parâmetros Visuais em Conformidade", "success");
+                ui.addLog("Parâmetros de Uniforme Aprovados", "success");
             }
         } else {
-            ui.addLog("Auditoria de Fardamento Cancelada (Patente Inválida)", "danger");
+            ui.addLog("Auditoria de Fardamento Abortada", "danger");
             temErroGeral = true;
         }
 
@@ -85,7 +102,7 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
 
     } catch (error) {
         ui.clearLogs();
-        ui.addLog(`Erro Crítico Operacional: ${error.message}`, "danger");
+        ui.addLog(`Erro Operacional: ${error.message}`, "danger");
         ui.setStatus(true);
     }
 });

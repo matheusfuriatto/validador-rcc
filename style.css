@@ -56,3 +56,18 @@ body { background-color: var(--bg-main); color: var(--text-white); min-height: 1
 .tag-log.warning { border-color: var(--color-warning); color: var(--color-warning); margin: 0 auto; }
 
 .hidden { display: none !important; }
+.rank-badge { 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 5px; 
+            padding: 4px 12px; 
+            border-radius: 99px; 
+            font-size: 12px; 
+            font-weight: 700; 
+            letter-spacing: 0.08em; 
+            text-transform: uppercase; 
+            border: 1px solid transparent; 
+            margin-top: 4px;
+            width: max-content; /* Garante que o texto longo não quebre linha */
+            max-width: 100%;
+        }

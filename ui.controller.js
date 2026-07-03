@@ -20,23 +20,27 @@ export class UiController {
         this.statusGeral.className = "status-indicator rank-desconhecido";
     }
 
-    renderProfile(name, figureString, genero, missao, patente) {
+renderProfile(name, figureString, genero, missao, patente) {
         this.nameEl.innerText = name;
         
-        // Exibição forçada de metadados cruciais na interface moderna
+        // Exibição de metadados na interface
         if (this.missionEl) this.missionEl.innerText = missao || "NÃO DEFINIDA";
         if (this.genderEl) this.genderEl.innerText = genero || "DESCONHECIDO";
         
-        // Atualização dinâmica da Badge militar polimórfica
+        // Atualização dinâmica da Badge com a formatação exata solicitada
         if (this.rankBadge) {
-            this.rankBadge.innerText = patente || "Desconhecido";
+            if (patente && patente !== "Desconhecido") {
+                // Força o texto em minúsculas para o rótulo conforme o seu exemplo
+                this.rankBadge.innerText = `equivalencia corpo militar: ${patente.toLowerCase()}`;
+            } else {
+                this.rankBadge.innerText = patente || "Desconhecido";
+            }
+            
             const classeBadge = patente ? patente.toLowerCase().replace(/\s+/g, '-') : 'desconhecido';
             this.rankBadge.className = `rank-badge rank-${classeBadge}`;
         }
 
         this.avatarHeadEl.src = `https://www.habbo.com.br/habbo-imaging/avatarimage?figure=${figureString}&headonly=1&size=m`;
-        
-        // Injeta o Manequim na div de visualização com renderização pixelada
         this.avatarDisplayEl.innerHTML = `<img src="https://www.habbo.com.br/habbo-imaging/avatarimage?figure=${figureString}&direction=4&head_direction=3&img_format=png&size=l" style="image-rendering: pixelated; height: 160px; margin-top: -10px;" alt="Mannequin">`;
     }
 
